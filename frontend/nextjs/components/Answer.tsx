@@ -4,10 +4,11 @@ import { Toaster, toast } from "react-hot-toast";
 import { useEffect, useState } from 'react';
 import { remark } from 'remark';
 import html from 'remark-html';
+import { Compatible } from "vfile";
 
 
 export default function Answer({ answer }: { answer: string }) {
-  async function markdownToHtml(markdown) {
+  async function markdownToHtml(markdown: Compatible | undefined) {
     try {
       const result = await remark().use(html).process(markdown);
       console.log('Markdown to HTML conversion result:', result.toString());
@@ -65,7 +66,7 @@ export default function Answer({ answer }: { answer: string }) {
           )}
         </div>
         <div className="flex flex-wrap content-center items-center gap-[15px]">
-          <div className="w-full whitespace-pre-wrap text-base font-light leading-[152.5%] text-white">
+          <div className="w-full whitespace-pre-wrap text-base font-light leading-[152.5%] text-white log-message">
             {answer ? (
               <div className="answer-container">
                 <div className="markdown-content" dangerouslySetInnerHTML={{ __html: htmlContent }} />

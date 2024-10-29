@@ -18,6 +18,29 @@ import { startLanggraphResearch } from '../components/Langgraph/Langgraph';
 import findDifferences from '../helpers/findDifferences';
 import HumanFeedback from "@/components/HumanFeedback";
 
+interface BaseData {
+  type: string;
+}
+
+interface BasicData extends BaseData {
+  type: 'basic';
+  content: string;
+}
+
+interface LanggraphButtonData extends BaseData {
+  type: 'langgraphButton';
+  link: string;
+}
+
+interface DifferencesData extends BaseData {
+  type: 'differences';
+  content: string;
+  output: string;
+}
+
+type Data = BasicData | LanggraphButtonData | DifferencesData;
+
+
 export default function Home() {
   const [promptValue, setPromptValue] = useState("");
   const [showResult, setShowResult] = useState(false);
@@ -29,10 +52,9 @@ export default function Home() {
   const [question, setQuestion] = useState("");
   const [sources, setSources] = useState<{ name: string; url: string }[]>([]);
   const [similarQuestions, setSimilarQuestions] = useState<string[]>([]);
-
-  const [socket, setSocket] = useState(null);
-  const [orderedData, setOrderedData] = useState([]);
-  const heartbeatInterval = useRef(null);
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [orderedData, setOrderedData] = useState<Data[]>([]);
+  const heartbeatInterval = useRef<number>();
   const [showHumanFeedback, setShowHumanFeedback] = useState(false);
   const [questionForHuman, setQuestionForHuman] = useState(false);
   
@@ -43,7 +65,7 @@ export default function Home() {
     }
   }, [orderedData]);
 
-  const startResearch = (chatBoxSettings) => {
+  const startResearch = (chatBoxSettings:any) => {
     const storedConfig = localStorage.getItem('apiVariables');
     const apiVariables = storedConfig ? JSON.parse(storedConfig) : {};
     const headers = {
@@ -83,7 +105,7 @@ export default function Home() {
             setOrderedData((prevOrder) => [...prevOrder, { ...data, contentAndType }]);
 
             if (data.type === 'report') {
-              setAnswer((prev) => prev + data.output);
+              setAnswer((prev:any) => prev + data.output);
             } else if (data.type === 'path') {
               setLoading(false);
               newSocket.close();
@@ -135,7 +157,7 @@ export default function Home() {
     setAnswer(""); // Reset answer for new query
 
     // Add the new question to orderedData
-    setOrderedData((prevOrder) => [...prevOrder, { type: 'question', content: newQuestion }]);
+    setOrderedData((prevOrder:any) => [...prevOrder, { type: 'question', content: newQuestion }]);
 
     const { report_type, report_source, tone } = chatBoxSettings;
 
@@ -194,16 +216,17 @@ export default function Home() {
     }
   };
 
-  const preprocessOrderedData = (data) => {
-    const groupedData = [];
-    let currentAccordionGroup = null;
-    let currentSourceGroup = null;
-    let currentReportGroup = null;
-    let finalReportGroup = null;
+  const preprocessOrderedData = (data:any) => {
+
+    const groupedData: any[] = [];
+    let currentAccordionGroup:any = null;
+    let currentSourceGroup:any = null;
+    let currentReportGroup:any = null;
+    let finalReportGroup:any = null;
     let sourceBlockEncountered = false;
     let lastSubqueriesIndex = -1;
   
-    data.forEach((item, index) => {
+    data.forEach((item:any, index:any) => {
       const { type, content, metadata, output, link } = item;
   
       if (type === 'report') {
@@ -258,7 +281,15 @@ export default function Home() {
             }
             sourceBlockEncountered = true;
           }
-          const hostname = new URL(metadata).hostname.replace('www.', '');
+          let hostname = "";
+          try {
+            if (typeof metadata === 'string') {
+              hostname = new URL(metadata).hostname.replace('www.', '');
+            }
+          } catch (e) {
+            console.error(`Invalid URL: ${metadata}`, e);
+            hostname = "unknown"; // Default or fallback value
+          }
           currentSourceGroup.items.push({ name: hostname, url: metadata });
         } else if (type !== 'path' && content !== '') {
           if (sourceBlockEncountered) {
@@ -288,21 +319,27 @@ export default function Home() {
   const renderComponentsInOrder = () => {
     const groupedData = preprocessOrderedData(orderedData);
     console.log('orderedData in renderComponentsInOrder: ', groupedData)
+    let statusReports = ["agent_generated","starting_research","planning_research"]
 
     return groupedData.map((data, index) => {
       if (data.type === 'accordionBlock') {
         const uniqueKey = `accordionBlock-${index}`;
-        const logs = data.items.map((item, subIndex) => ({
+        const logs = data.items.map((item:any, subIndex:any) => ({
           header: item.content,
           text: item.output,
+          metadata: item.metadata,
           key: `${item.type}-${item.content}-${subIndex}`,
         }));
 
-        return <LogMessage key={uniqueKey} logs={logs} />;
+        return (
+           <div className="container mx-auto">
+              <LogMessage key={uniqueKey} logs={logs} />
+            </div>
+        )
 
       } else if (data.type === 'sourceBlock') {
         const uniqueKey = `sourceBlock-${index}`;
-        return <Sources key={uniqueKey} sources={data.items} isLoading={false} />;
+        return <Sources key={uniqueKey} sources={data.items}/>;
       } else if (data.type === 'reportBlock') {
         const uniqueKey = `reportBlock-${index}`;
         return <Answer key={uniqueKey} answer={data.content} />;
@@ -338,6 +375,16 @@ export default function Home() {
           );
         } else if (type === 'path') {
           return <AccessReport key={uniqueKey} accessData={output} report={answer} />;
+        } else if (statusReports.includes(data.content)) {
+          const uniqueKey = `accordionBlock-${index}`;
+          const logs = [{
+            header: data.content,
+            text: data.output,
+            metadata: data.metadata,
+            key: `${data.type}-${data.content}`,
+          }]
+
+          return <LogMessage key={uniqueKey} logs={logs} />;
         } else {
           return null;
         }
@@ -360,7 +407,7 @@ export default function Home() {
         {showResult && (
           <div className="flex h-full min-h-[68vh] w-full grow flex-col justify-between">
             <div className="container w-full space-y-2">
-              <div className="container space-y-2">
+              <div className="container space-y-2 task-components">
                 {renderComponentsInOrder()}
               </div>
 
