@@ -1,4 +1,6 @@
-module.exports = {
-  output: 'export',
-  distDir: 'out', // Use 'dist' instead of 'out' for Cloudflare Pages
+/** @type {import('next').NextConfig} */
+const nextConfig = {
+  output: 'export', // Enables static exports
 };
+
+module.exports = nextConfig;
