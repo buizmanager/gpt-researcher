@@ -1,0 +1,17 @@
+modules = ["python-3.10", "nodejs-20", "web"]
+run = "npm run dev"
+
+[nix]
+channel = "stable-24_05"
+
+[deployment]
+run = ["sh", "-c", "npm run dev"]
+
+[[ports]]
+localPort = 3000
+externalPort = 80
+
+[[ports]]
+localPort = 8976
+externalPort = 3000
+exposeLocalhost = true
